@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Listen Training App</title>
+    <style>
+        body { font-family: Arial, sans-serif; display: flex; height: 100vh; margin: 0; }
+        #left-panel { width: 40%; border-right: 1px solid #ccc; padding: 10px; overflow-y: auto; }
+        #right-panel { width: 60%; padding: 10px; }
+        .scene-group { margin-bottom: 20px; }
+        .sentence-item { cursor: pointer; display: flex; align-items: center; margin-bottom: 5px; }
+        .sentence-item input { margin-right: 10px; }
+        .sentence-item.familiar { color: green; }
+        .sentence-item.unfamiliar { color: red; }
+        #current-sentence { font-size: 18px; margin-bottom: 20px; }
+        #controls { display: flex; flex-direction: column; }
+        button { margin-right: 10px; margin-bottom: 10px; }
+        #speed-slider { width: 200px; }
+        #total-count { margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <div id="left-panel">
+        <h2>Corpus Browser</h2>
+        <div id="total-count"></div>
+        <div id="sentence-list"></div>
+    </div>
+    <div id="right-panel">
+        <h2>Training Interface</h2>
+        <div id="current-sentence"></div>
+        <div id="controls">
+            <button id="play-btn">Play</button>
+            <button id="loop-btn">Toggle Loop (Off)</button>
+            <button id="next-btn">Next</button>
+            <button id="repeat-btn">Repeat Current</button>
+            <label for="speed-slider">Speed: <span id="speed-value">1.0</span>x</label>
+            <input type="range" id="speed-slider" min="0.75" max="2" step="0.25" value="1">
+            <div>
+                <input type="checkbox" id="familiar-checkbox"> Familiar
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Sample sentences per scene (at least 3 variants each)
+        const scenes = {
+            'Bank Video Verification': [
+                "Please hold your ID card up to the camera for verification.",
+                "Can you show your passport clearly in front of the webcam?",
+                "We need to authenticate your identity by seeing your face and document."
+            ],
+            'Exam': [
+                "Read the instructions carefully before starting the test.",
+                "You have 60 minutes to complete this examination.",
+                "Please raise your hand if you have any questions during the exam."
+            ],
+            'Government': [
+                "Please provide your social security number for processing.",
+                "You need to fill out this form and submit it to the office.",
+                "Your application will be reviewed within 5 business days."
+            ],
+            'Insurance': [
+                "What is the policy number for your insurance claim?",
+                "We cover damages up to $10,000 for this type of incident.",
+                "Please describe the accident in detail for the report."
+            ],
+            'Stranger Calls': [
+                "Hello, this is from your bank, can you confirm your account details?",
+                "We detected suspicious activity on your card, please verify.",
+                "This is a courtesy call regarding your recent purchase."
+            ]
+        };
+
+        // Flatten all sentences with metadata
+        let allSentences = [];
+        Object.keys(scenes).forEach(scene => {
+            scenes[scene].forEach(sentence => {
+                allSentences.push({ scene, sentence, familiar: false });
+            });
+        });
+
+        // Load from localStorage if available
+        const storedData = localStorage.getItem('sentenceData');
+        if (storedData) {
+            allSentences = JSON.parse(storedData);
+        }
+
+        // Save to localStorage
+        function saveData() {
+            localStorage.setItem('sentenceData', JSON.stringify(allSentences));
+        }
+
+        // Render left panel
+        function renderLeftPanel() {
+            const list = document.getElementById('sentence-list');
+            list.innerHTML = '';
+            Object.keys(scenes).forEach(scene => {
+                const group = document.createElement('div');
+                group.className = 'scene-group';
+                group.innerHTML = `<h3>${scene}</h3>`;
+                allSentences.filter(s => s.scene === scene).forEach((item, index) => {
+                    const globalIndex = allSentences.findIndex(s => s.scene === scene && s.sentence === item.sentence);
+                    const div = document.createElement('div');
+                    div.className = 'sentence-item ' + (item.familiar ? 'familiar' : 'unfamiliar');
+                    div.innerHTML = `
+                        <input type="checkbox" ${item.familiar ? 'checked' : ''} data-index="${globalIndex}">
+                        ${item.sentence}
+                    `;
+                    div.querySelector('input').addEventListener('change', (e) => {
+                        allSentences[globalIndex].familiar = e.target.checked;
+                        saveData();
+                        renderLeftPanel();
+                    });
+                    div.addEventListener('click', () => loadSentence(globalIndex));
+                    group.appendChild(div);
+                });
+                list.appendChild(group);
+            });
+
+            // Total count
+            document.getElementById('total-count').textContent = `Total Sentences: ${allSentences.length}`;
+        }
+
+        renderLeftPanel();
+
+        // Training logic
+        let currentIndex = 0;
+        let isLooping = false;
+        let speech = new SpeechSynthesisUtterance();
+        let speed = 1.0;
+        speech.lang = 'en-US'; // Assuming English for listening practice
+
+        function loadSentence(index) {
+            currentIndex = index;
+            const item = allSentences[index];
+            document.getElementById('current-sentence').textContent = item.sentence;
+            document.getElementById('familiar-checkbox').checked = item.familiar;
+            speech.text = item.sentence;
+            speech.rate = speed;
+        }
+
+        // Play button
+        document.getElementById('play-btn').addEventListener('click', () => {
+            speechSynthesis.cancel();
+            speechSynthesis.speak(speech);
+        });
+
+        // Loop toggle
+        document.getElementById('loop-btn').addEventListener('click', () => {
+            isLooping = !isLooping;
+            document.getElementById('loop-btn').textContent = `Toggle Loop (${isLooping ? 'On' : 'Off'})`;
+            if (isLooping) {
+                speech.onend = () => {
+                    if (isLooping) speechSynthesis.speak(speech);
+                };
+            } else {
+                speech.onend = null;
+            }
+        });
+
+        // Next button - skip familiar, go to next unfamiliar
+        document.getElementById('next-btn').addEventListener('click', () => {
+            let nextIndex = (currentIndex + 1) % allSentences.length;
+            while (allSentences[nextIndex].familiar) {
+                nextIndex = (nextIndex + 1) % allSentences.length;
+                if (nextIndex === currentIndex) break; // All familiar
+            }
+            loadSentence(nextIndex);
+            speechSynthesis.cancel();
+            speechSynthesis.speak(speech);
+            if (isLooping) {
+                speech.onend = () => {
+                    if (isLooping) speechSynthesis.speak(speech);
+                };
+            }
+        });
+
+        // Repeat current
+        document.getElementById('repeat-btn').addEventListener('click', () => {
+            speechSynthesis.cancel();
+            speechSynthesis.speak(speech);
+        });
+
+        // Speed slider
+        const speedSlider = document.getElementById('speed-slider');
+        const speedValue = document.getElementById('speed-value');
+        speedSlider.addEventListener('input', () => {
+            speed = parseFloat(speedSlider.value);
+            speedValue.textContent = speed.toFixed(2);
+            speech.rate = speed;
+        });
+
+        // Familiar checkbox in right panel
+        document.getElementById('familiar-checkbox').addEventListener('change', (e) => {
+            allSentences[currentIndex].familiar = e.target.checked;
+            saveData();
+            renderLeftPanel();
+        });
+
+        // Initial load
+        loadSentence(0);
+    </script>
+</body>
+</html>
