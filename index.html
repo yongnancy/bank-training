@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Listen Training App</title>
+    <title>Bank Video Verification Training App</title>
     <style>
         body { font-family: Arial, sans-serif; display: flex; height: 100vh; margin: 0; }
         #left-panel { width: 40%; border-right: 1px solid #ccc; padding: 10px; overflow-y: auto; }
@@ -31,6 +31,7 @@
         <div id="current-sentence"></div>
         <div id="controls">
             <button id="play-btn">Play</button>
+            <button id="stop-btn">Stop</button>
             <button id="loop-btn">Toggle Loop (Off)</button>
             <button id="next-btn">Next</button>
             <button id="repeat-btn">Repeat Current</button>
@@ -43,40 +44,55 @@
     </div>
 
     <script>
-        // Sample sentences per scene (at least 3 variants each)
-        const scenes = {
-            'Bank Video Verification': [
-                "Please hold your ID card up to the camera for verification.",
-                "Can you show your passport clearly in front of the webcam?",
-                "We need to authenticate your identity by seeing your face and document."
+        // Define stages for Bank Video Verification full flow
+        const stages = {
+            'Greeting and Introduction': [
+                "Hello, thank you for choosing our bank. We will now begin the video verification process.",
+                "Welcome to the secure video identity verification for your account.",
+                "Good day, this is the video authentication step to ensure your security."
             ],
-            'Exam': [
-                "Read the instructions carefully before starting the test.",
-                "You have 60 minutes to complete this examination.",
-                "Please raise your hand if you have any questions during the exam."
+            'Instructions for Setup': [
+                "Please ensure your camera is on and you are in a well-lit area.",
+                "Make sure your face is clearly visible and there are no obstructions.",
+                "Position yourself so that your full face is centered in the camera frame."
             ],
-            'Government': [
-                "Please provide your social security number for processing.",
-                "You need to fill out this form and submit it to the office.",
-                "Your application will be reviewed within 5 business days."
+            'Request for ID Document': [
+                "Please hold your government-issued ID up to the camera.",
+                "Show your driver's license or passport clearly in front of the webcam.",
+                "Display your identification card so that all details are readable."
             ],
-            'Insurance': [
-                "What is the policy number for your insurance claim?",
-                "We cover damages up to $10,000 for this type of incident.",
-                "Please describe the accident in detail for the report."
+            'Face Verification': [
+                "Now, look directly into the camera and hold still for a moment.",
+                "Please smile and turn your head slightly to the left and right.",
+                "Blink your eyes twice while facing the camera for verification."
             ],
-            'Stranger Calls': [
-                "Hello, this is from your bank, can you confirm your account details?",
-                "We detected suspicious activity on your card, please verify.",
-                "This is a courtesy call regarding your recent purchase."
+            'Information Confirmation': [
+                "Can you please state your full name as it appears on your ID?",
+                "Verify your date of birth for the record.",
+                "Confirm your account number or the last four digits of your social security number."
+            ],
+            'Additional Checks': [
+                "We need to verify the address on your ID matches our records.",
+                "Please read the security code displayed on your screen.",
+                "Answer this security question: What is your mother's maiden name?"
+            ],
+            'Error Handling': [
+                "The image is not clear; please hold the ID steady and try again.",
+                "We couldn't detect your face properly; adjust your lighting.",
+                "Verification failed; let's retry the process from the beginning."
+            ],
+            'Completion and Closing': [
+                "Verification successful. Your account is now activated.",
+                "Thank you for completing the video verification. Have a great day.",
+                "Process complete. You will receive a confirmation email shortly."
             ]
         };
 
         // Flatten all sentences with metadata
         let allSentences = [];
-        Object.keys(scenes).forEach(scene => {
-            scenes[scene].forEach(sentence => {
-                allSentences.push({ scene, sentence, familiar: false });
+        Object.keys(stages).forEach(stage => {
+            stages[stage].forEach(sentence => {
+                allSentences.push({ stage, sentence, familiar: false });
             });
         });
 
@@ -95,12 +111,12 @@
         function renderLeftPanel() {
             const list = document.getElementById('sentence-list');
             list.innerHTML = '';
-            Object.keys(scenes).forEach(scene => {
+            Object.keys(stages).forEach(stage => {
                 const group = document.createElement('div');
                 group.className = 'scene-group';
-                group.innerHTML = `<h3>${scene}</h3>`;
-                allSentences.filter(s => s.scene === scene).forEach((item, index) => {
-                    const globalIndex = allSentences.findIndex(s => s.scene === scene && s.sentence === item.sentence);
+                group.innerHTML = `<h3>${stage}</h3>`;
+                allSentences.filter(s => s.stage === stage).forEach((item, index) => {
+                    const globalIndex = allSentences.findIndex(s => s.stage === stage && s.sentence === item.sentence);
                     const div = document.createElement('div');
                     div.className = 'sentence-item ' + (item.familiar ? 'familiar' : 'unfamiliar');
                     div.innerHTML = `
@@ -129,7 +145,7 @@
         let isLooping = false;
         let speech = new SpeechSynthesisUtterance();
         let speed = 1.0;
-        speech.lang = 'en-US'; // Assuming English for listening practice
+        speech.lang = 'en-US'; // Assuming English, but can adjust if needed
 
         function loadSentence(index) {
             currentIndex = index;
@@ -144,13 +160,26 @@
         document.getElementById('play-btn').addEventListener('click', () => {
             speechSynthesis.cancel();
             speechSynthesis.speak(speech);
+            if (isLooping) {
+                speech.onend = () => {
+                    if (isLooping) speechSynthesis.speak(speech);
+                };
+            }
+        });
+
+        // Stop button
+        document.getElementById('stop-btn').addEventListener('click', () => {
+            speechSynthesis.cancel();
+            isLooping = false;
+            document.getElementById('loop-btn').textContent = `Toggle Loop (Off)`;
+            speech.onend = null;
         });
 
         // Loop toggle
         document.getElementById('loop-btn').addEventListener('click', () => {
             isLooping = !isLooping;
             document.getElementById('loop-btn').textContent = `Toggle Loop (${isLooping ? 'On' : 'Off'})`;
-            if (isLooping) {
+            if (isLooping && speechSynthesis.speaking) {
                 speech.onend = () => {
                     if (isLooping) speechSynthesis.speak(speech);
                 };
@@ -180,6 +209,11 @@
         document.getElementById('repeat-btn').addEventListener('click', () => {
             speechSynthesis.cancel();
             speechSynthesis.speak(speech);
+            if (isLooping) {
+                speech.onend = () => {
+                    if (isLooping) speechSynthesis.speak(speech);
+                };
+            }
         });
 
         // Speed slider
@@ -203,3 +237,4 @@
     </script>
 </body>
 </html>
+```peak(s
