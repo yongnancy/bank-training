@@ -44,7 +44,15 @@
     </div>
 
     <script>
-        // Define stages for Bank Video Verification full flow
+       document.addEventListener('DOMContentLoaded', () => {
+    speechSynthesis.onvoiceschanged = () => {
+        const voices = speechSynthesis.getVoices();
+        const femaleVoice = voices.find(v => v.lang.startsWith('en-') && (v.name.includes('Google') || v.gender === 'female' || v.name.includes('Samantha') || v.name.includes('Female')));
+        if (femaleVoice) {
+            speech.voice = femaleVoice;
+        }
+    };
+     // Define stages for Bank Video Verification full flow
         const stages = {
             'Greeting and Introduction': [
                 "Hello, thank you for choosing our bank. We will now begin the video verification process.",
