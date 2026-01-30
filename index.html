@@ -18,6 +18,11 @@
         button { margin-right: 10px; margin-bottom: 10px; }
         #speed-slider { width: 200px; }
         #total-count { margin-bottom: 10px; }
+        @media (max-width: 768px) {
+            body { flex-direction: column; }
+            #left-panel { width: 100%; height: 50%; border-right: none; border-bottom: 1px solid #ccc; }
+            #right-panel { width: 100%; height: 50%; }
+        }
     </style>
 </head>
 <body>
@@ -44,15 +49,7 @@
     </div>
 
     <script>
-       document.addEventListener('DOMContentLoaded', () => {
-    speechSynthesis.onvoiceschanged = () => {
-        const voices = speechSynthesis.getVoices();
-        const femaleVoice = voices.find(v => v.lang.startsWith('en-') && (v.name.includes('Google') || v.gender === 'female' || v.name.includes('Samantha') || v.name.includes('Female')));
-        if (femaleVoice) {
-            speech.voice = femaleVoice;
-        }
-    };
-     // Define stages for Bank Video Verification full flow
+        // Define stages for Bank Video Verification full flow (24 sentences total)
         const stages = {
             'Greeting and Introduction': [
                 "Hello, thank you for choosing our bank. We will now begin the video verification process.",
@@ -155,6 +152,23 @@
         let speed = 1.0;
         speech.lang = 'en-US'; // Assuming English, but can adjust if needed
 
+        // Select natural female voice when voices are loaded
+        speechSynthesis.onvoiceschanged = () => {
+            const voices = speechSynthesis.getVoices();
+            // Prefer Google female voices or any natural-sounding female voice
+            const preferredVoice = voices.find(v => 
+                v.lang.startsWith('en-') && 
+                (v.name.includes('Google US English') || v.name.includes('Google') && v.name.includes('female') || 
+                 v.name.includes('Samantha') || v.name.includes('Female') || v.name.includes('Premium'))
+            ) || voices.find(v => v.lang.startsWith('en-') && v.gender === 'female');
+            if (preferredVoice) {
+                speech.voice = preferredVoice;
+            }
+        };
+
+        // Trigger voices loading if not already
+        speechSynthesis.getVoices();
+
         function loadSentence(index) {
             currentIndex = index;
             const item = allSentences[index];
@@ -245,4 +259,3 @@
     </script>
 </body>
 </html>
-```peak(s
